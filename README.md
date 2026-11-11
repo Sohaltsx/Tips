@@ -8,6 +8,7 @@ fires an on-stream **Streamlabs alert** with the viewer's name, amount and messa
 - Hosting: GitHub Pages + Supabase free tier + Streamlabs free.
 - Target: **GTA 6 launch streams — 19 Nov 2026**.
 - Live at: `https://sohaltsx.github.io/Tips/`
+- **Progress & next steps: [STATUS.md](STATUS.md)**
 
 > This repo is **public**. Never commit secrets. Only the Razorpay **key ID** (public by design)
 > goes in `assets/config.js`; everything else lives in Supabase secrets.
@@ -102,10 +103,13 @@ that stays with the signed webhook.
 (`config.toml` sets the same thing.) Each function does its own checks instead.
 
 ### 4. Streamlabs
-1. streamlabs.com → Settings → API Settings → **Register an App** (whitelist your own account), then
-   complete the OAuth flow with scope **`donations.create`** to get an access token
-   (or use the "API Access Token" shown under API Settings → API Tokens if your account has it).
-2. Put it in `.env` as `STREAMLABS_ACCESS_TOKEN` and re-run `supabase secrets set --env-file .env`.
+1. streamlabs.com → Account Settings → API Settings → **Register App** (whitelist your own account,
+   redirect URL `http://localhost:8787/callback`). Put the Client ID / Secret in `.env` as
+   `STREAMLABS_CLIENT_ID` / `STREAMLABS_CLIENT_SECRET`.
+   (The "API Access Token" on the API Tokens tab does **not** work — the API returns 401.)
+2. Run `node --env-file=.env scripts/streamlabs-auth.mjs`, open the link, Approve — it saves an
+   OAuth token with `donations.create` into `.env` as `STREAMLABS_ACCESS_TOKEN`. Then re-run
+   `supabase secrets set --env-file .env`.
 3. Alertbox → Donations: image/GIF, sound, TTS voice (Hindi/English), **TTS min amount ₹50**.
 4. Add the Alertbox URL as a Browser Source in OBS.
 
