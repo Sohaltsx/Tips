@@ -69,6 +69,15 @@ test("webhook signature: valid, tampered, wrong secret, missing", async () => {
   assert.equal(await verifyRazorpaySignature(body, sig, ""), false);
 });
 
+test("checkout signature: HMAC(order_id|payment_id, key_secret)", async () => {
+  const secret = "test_key_secret";
+  const sig = await hmacSha256Hex(secret, "order_ABC|pay_XYZ");
+  // independent reference via Node's crypto
+  const { createHmac } = await import("node:crypto");
+  assert.equal(sig, createHmac("sha256", secret).update("order_ABC|pay_XYZ").digest("hex"));
+  assert.equal(timingSafeEqual(sig, await hmacSha256Hex(secret, "order_ABC|pay_OTHER")), false);
+});
+
 test("known HMAC vector", async () => {
   // RFC 4231 test case 2
   assert.equal(

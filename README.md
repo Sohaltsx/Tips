@@ -42,7 +42,7 @@ index.html  success.html                 tip page + thank-you page
 terms.html  privacy.html  refunds.html  contact.html   (needed for Razorpay website review)
 assets/     config.js (public config) · app.js · style.css · logo.webp
 supabase/
-  schema.sql                              tips + rate_limits tables, RLS on, no public policies
+  migrations/20261111000000_init.sql      tips + rate_limits tables, RLS on, no public policies
   config.toml                             verify_jwt = false for all three functions
   functions/
     create-order/      razorpay-webhook/      health/
@@ -68,7 +68,10 @@ Brand: `#111111` background · `#f20d24` accent · `#ffffff` text · `#343434` l
 
 ### 1. Supabase
 1. Create a free project at supabase.com. Note the **project ref** (`https://<ref>.supabase.co`).
-2. Dashboard → SQL Editor → paste and run [`supabase/schema.sql`](supabase/schema.sql).
+2. Database schema lives in [`supabase/migrations/`](supabase/migrations/). With the Supabase ↔ GitHub
+   integration (Project Settings → Integrations → GitHub, Supabase directory `.`, production branch
+   `main`), pushes to `main` apply new migrations automatically. Without it, paste the migration into
+   Dashboard → SQL Editor and run it, or run `supabase db push`.
 3. Install the CLI (`npm i -g supabase` or `scoop install supabase`), then:
    ```bash
    supabase login
@@ -88,7 +91,13 @@ supabase secrets set --env-file .env
 supabase functions deploy create-order --no-verify-jwt
 supabase functions deploy razorpay-webhook --no-verify-jwt
 supabase functions deploy health --no-verify-jwt
+supabase functions deploy verify-payment --no-verify-jwt
 ```
+(On Windows PowerShell, use `npx.cmd supabase …` if `npx` is blocked by the execution policy.)
+
+`verify-payment` checks the Checkout signature `HMAC-SHA256(order_id|payment_id, key_secret)` so the
+page only shows "thank you" for a genuine payment. It never marks a tip paid or fires an alert —
+that stays with the signed webhook.
 `--no-verify-jwt` is required: the browser, Razorpay and the keep-alive ping have no Supabase JWT.
 (`config.toml` sets the same thing.) Each function does its own checks instead.
 

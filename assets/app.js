@@ -120,6 +120,24 @@
       });
   });
 
+  // Resolves "verified" | "invalid" | "unknown" (couldn't reach the server).
+  function verifyPayment(resp) {
+    return fetch(C.SUPABASE_FUNCTIONS_URL + "/verify-payment", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        razorpay_order_id: resp.razorpay_order_id,
+        razorpay_payment_id: resp.razorpay_payment_id,
+        razorpay_signature: resp.razorpay_signature
+      })
+    })
+      .then(function (res) {
+        if (res.ok) return "verified";
+        return res.status === 400 ? "invalid" : "unknown";
+      })
+      .catch(function () { return "unknown"; });
+  }
+
   function openCheckout(order, v) {
     var rzp = new window.Razorpay({
       key: order.key_id || C.RAZORPAY_KEY_ID,
@@ -131,12 +149,24 @@
       image: new URL("assets/logo.webp", location.href).href,
       theme: { color: "#f20d24", backdrop_color: "#111111" },
       // Prefill nothing personal — Razorpay collects contact/email itself.
-      handler: function () {
-        // UI only. The alert is fired by the verified webhook on the server.
-        try {
-          sessionStorage.setItem("lastTip", JSON.stringify({ name: v.name, amount: v.amount }));
-        } catch (_) { /* storage unavailable — success page shows a generic thanks */ }
-        location.href = "success.html";
+      handler: function (resp) {
+        // Confirm the Checkout signature server-side, then show the thank-you page.
+        // UI only — the on-stream alert is fired by the signed webhook, never from here.
+        btnText.textContent = "Confirming…";
+        verifyPayment(resp).then(function (result) {
+          if (result === "invalid") {
+            setLoading(false);
+            onAmountChange();
+            showError("We couldn't verify this payment. If money was debited, contact us with your payment ID: " +
+              resp.razorpay_payment_id);
+            return;
+          }
+          // "verified" or "unknown" (network hiccup): payment went through on Razorpay's side.
+          try {
+            sessionStorage.setItem("lastTip", JSON.stringify({ name: v.name, amount: v.amount }));
+          } catch (_) { /* storage unavailable — success page shows a generic thanks */ }
+          location.href = "success.html";
+        });
       },
       modal: {
         confirm_close: true,

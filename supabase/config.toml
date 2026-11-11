@@ -4,12 +4,15 @@
 # verification is turned off. Each function does its own checks instead
 # (CORS + validation + rate limit, HMAC signature, read-only health query).
 
-project_id = "sohal-tips"
+project_id = "pqvygvligzexbeloakkn"
 
 [functions.create-order]
 verify_jwt = false
 
 [functions.razorpay-webhook]
+verify_jwt = false
+
+[functions.verify-payment]
 verify_jwt = false
 
 [functions.health]

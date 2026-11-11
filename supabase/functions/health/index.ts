@@ -4,7 +4,9 @@ import { json } from "../_shared/cors.ts";
 import { db } from "../_shared/db.ts";
 
 Deno.serve(async () => {
-  const { error } = await db().from("tips").select("id", { head: true, count: "exact" }).limit(1);
+  // Real (non-HEAD) query: a HEAD request can't carry an error body, so a missing
+  // table would look healthy.
+  const { error } = await db().from("tips").select("id").limit(1);
   if (error) {
     console.error("health db error", error);
     return json({ ok: false }, 500);

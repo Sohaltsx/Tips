@@ -1,5 +1,5 @@
 -- Sohal Gaming Tips — database schema
--- Run once in Supabase Dashboard → SQL Editor (or `supabase db push` if you use migrations).
+-- Applied by the Supabase GitHub integration on push to main (or `supabase db push`).
 -- Only the Edge Functions (service role) can read or write these tables.
 
 create extension if not exists pgcrypto;
