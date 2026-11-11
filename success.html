@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Thank You · Sohal Gaming</title>
+  <meta name="theme-color" content="#111111">
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="assets/logo.webp" type="image/webp">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Rajdhani:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <main class="wrap">
+    <header class="brand">
+      <img class="avatar" src="assets/logo.webp" alt="Sohal Gaming" width="112" height="112">
+    </header>
+
+    <section class="card success">
+      <div class="tick" aria-hidden="true">✓</div>
+      <h2 id="title">Thank you!</h2>
+      <p id="detail">Your tip was received. Watch the stream — your alert will pop up in a few seconds.</p>
+      <div class="actions">
+        <a class="btn" id="watch" href="#" target="_blank" rel="noopener">Back to the stream</a>
+        <a class="btn ghost" href="index.html">Send another tip</a>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <nav>
+      <a href="terms.html">Terms</a>
+      <a href="privacy.html">Privacy</a>
+      <a href="refunds.html">Refunds</a>
+      <a href="contact.html">Contact</a>
+    </nav>
+    © <span id="year"></span> Sohal Gaming
+  </footer>
+
+  <script src="assets/config.js"></script>
+  <script>
+    (function () {
+      var C = window.TIP_CONFIG;
+      document.getElementById("year").textContent = new Date().getFullYear();
+      document.getElementById("watch").href = C.CHANNEL_URL;
+      var tip = null;
+      try {
+        tip = JSON.parse(sessionStorage.getItem("lastTip") || "null");
+        sessionStorage.removeItem("lastTip");
+      } catch (_) {}
+      if (tip && tip.name && tip.amount) {
+        document.getElementById("title").textContent = "Thank you, " + tip.name + "!";
+        var d = document.getElementById("detail");
+        d.textContent = "Your tip of ";
+        var b = document.createElement("span");
+        b.className = "amount";
+        b.textContent = "₹" + Number(tip.amount).toLocaleString("en-IN");
+        d.appendChild(b);
+        d.appendChild(document.createTextNode(" was received. Watch the stream — your alert will pop up in a few seconds."));
+      }
+    })();
+  </script>
+</body>
+</html>

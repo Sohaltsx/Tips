@@ -1,0 +1,16 @@
+# Minimal Supabase CLI config for this project.
+# Every function is called by something that does NOT have a Supabase JWT
+# (the public tip page, Razorpay's webhook, the keep-alive ping), so JWT
+# verification is turned off. Each function does its own checks instead
+# (CORS + validation + rate limit, HMAC signature, read-only health query).
+
+project_id = "sohal-tips"
+
+[functions.create-order]
+verify_jwt = false
+
+[functions.razorpay-webhook]
+verify_jwt = false
+
+[functions.health]
+verify_jwt = false
