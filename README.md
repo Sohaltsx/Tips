@@ -262,9 +262,8 @@ Day-to-day progress notes live in [STATUS.md](STATUS.md).
       Influencer / Media* (never Gaming, Donation or Crowdfunding), lowest turnover range.
 - [ ] Business type **Individual** (or Sole Proprietorship), personal PAN, no GST, own bank account.
       Describe it as voluntary **tips** from live-stream viewers (not "donations").
-- [ ] Fill the legal placeholders in `terms.html`, `privacy.html`, `refunds.html`, `contact.html`
-      (`[YOUR LEGAL NAME as on PAN]`, `[YOUR CONTACT EMAIL]`, `[YOUR CITY, STATE]`) **before**
-      submitting KYC — Cashfree reviews the website.
+- [x] Legal pages filled in (name as on PAN, contact email, Ludhiana, Punjab) — Cashfree
+      reviews the website during KYC.
 - [ ] Submit KYC and ask about the "Payment Gateway @ 0%" offer (which methods, how long, what cap).
 
 ### 2. Cashfree test setup (can start before KYC is approved)

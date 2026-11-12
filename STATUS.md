@@ -92,8 +92,7 @@ What changed (branch `ccr-0d80feb9-yhl5ui`, not yet on `main`):
 5. **Alert Box polish:** donation alert image/sound, TTS voice, TTS min ₹50; Alert Box added in OBS.
 
 ## Before going live
-- [ ] Fill legal placeholders in `terms.html`, `privacy.html`, `refunds.html`, `contact.html`:
-      `[YOUR LEGAL NAME as on PAN]`, `[YOUR CONTACT EMAIL]`, `[YOUR CITY, STATE]`.
+- [x] Legal placeholders filled in `terms.html`, `privacy.html`, `refunds.html`, `contact.html` (12 Nov).
 - [ ] Confirm YouTube handle in `assets/config.js` (`CHANNEL_URL`, currently `@Sohal007`) and `contact.html`.
 - [ ] Cashfree KYC approved → Production API keys → `CASHFREE_ENV=production` in Supabase secrets
       and `CASHFREE_MODE: "production"` in `assets/config.js`; whitelist the domain in production.
