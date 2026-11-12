@@ -41,6 +41,11 @@ async function isRateLimited(ip: string): Promise<boolean> {
   return false;
 }
 
+/** Drop characters outside the Basic Multilingual Plane (emoji, some symbols) and cap length. */
+function notesSafe(s: string): string {
+  return s.replace(/[\u{10000}-\u{10FFFF}]/gu, "").replace(/️|‍/g, "").replace(/\s+/g, " ").trim().slice(0, 250);
+}
+
 interface ValidInput {
   name: string;
   message: string;
@@ -114,7 +119,9 @@ Deno.serve(async (req) => {
       amount: amountPaise,
       currency: CURRENCY,
       receipt: tipId,
-      notes: { tip_id: tipId, name: name.slice(0, 250), message: message.slice(0, 250) },
+      // Razorpay rejects 4-byte UTF-8 (emoji etc.) in notes, so strip those here only.
+      // The full name/message (with emoji) is stored in our DB and used for the alert.
+      notes: { tip_id: tipId, name: notesSafe(name), message: notesSafe(message) },
     }),
     signal: AbortSignal.timeout(10_000),
   }).catch((e) => {

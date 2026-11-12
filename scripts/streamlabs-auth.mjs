@@ -25,11 +25,11 @@ if (!clientId || !clientSecret) {
 }
 
 const state = randomBytes(16).toString("hex");
-const authUrl = "https://streamlabs.com/api/v1.0/authorize?" + new URLSearchParams({
+const authUrl = "https://streamlabs.com/api/v2.0/authorize?" + new URLSearchParams({
   client_id: clientId,
   redirect_uri: REDIRECT_URI,
   response_type: "code",
-  scope: "donations.create",
+  scope: "donations.read donations.create",
   state,
 });
 
@@ -40,7 +40,7 @@ const server = createServer(async (req, res) => {
   const code = url.searchParams.get("code");
   if (!code) return res.writeHead(400).end("No code: " + (url.searchParams.get("error") ?? "unknown"));
 
-  const tokenRes = await fetch("https://streamlabs.com/api/v1.0/token", {
+  const tokenRes = await fetch("https://streamlabs.com/api/v2.0/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
@@ -64,7 +64,7 @@ const server = createServer(async (req, res) => {
     ? env.replace(/^STREAMLABS_ACCESS_TOKEN=.*$/m, line)
     : env.trimEnd() + "\n" + line + "\n";
   writeFileSync(envPath, env);
-  console.log("Saved STREAMLABS_ACCESS_TOKEN to .env (scope: donations.create).");
+  console.log("Saved STREAMLABS_ACCESS_TOKEN to .env (scope: donations.read + donations.create).");
   res.writeHead(200, { "Content-Type": "text/html" })
     .end("<h2>Done! Token saved to .env. You can close this tab.</h2>");
   server.close();
