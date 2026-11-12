@@ -48,15 +48,16 @@
       for (const [k, f] of Object.entries(fields)) tokens[k] = f.value;
       const name = document.getElementById("name").value;
       const amount = Number(document.getElementById("amount").value || 0);
-      tokens.messageTemplate =
-        `<span data-token="name">${esc(name)}</span> donated <span data-token="amount">₹${amount.toFixed(2)}</span>!`;
-      tokens.userMessage = esc(document.getElementById("message").value);
-      tokens.img = "";
-      const fill = (s) => s.replace(/\{(\w+)\}/g, (m, k) => (k in tokens ? tokens[k] : m));
+      // Same as Streamlabs: event fields are HTML-escaped into the HTML, raw into CSS/JS.
+      const data = { name, amount: amount.toFixed(2), message: document.getElementById("message").value };
+      const fill = (s, escape) => s.replace(/\{(\w+)\}/g, (m, k) =>
+        k in data ? (escape ? esc(data[k]) : data[k]) : k in tokens ? tokens[k] : m);
+      // Streamlabs leaves {message} in place when a tip has no message.
+      if (!data.message) delete data.message;
 
       document.getElementById("frame").srcdoc =
         `<!doctype html><html><head><meta charset="utf-8"><style>${fill(files.css)}</style></head>` +
-        `<body>${fill(files.html)}<script>${fill(files.js)}<\/script></body></html>`;
+        `<body>${fill(files.html, true)}<script>${fill(files.js)}<\/script></body></html>`;
     }
 
     Promise.all(["alert.html", "alert.css", "alert.js", "fields.json"].map(load)).then(([html, css, js, fields]) => {

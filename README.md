@@ -113,10 +113,10 @@ that stays with the signed webhook.
    `supabase secrets set --env-file .env`.
 3. Alertbox → Donations: image/GIF, sound, TTS voice (Hindi/English), **TTS min amount ₹50**.
 4. Add the Alertbox URL as a Browser Source in OBS.
-5. **Branded alert (custom code):** Alertbox → Donations → turn on **Enable Custom HTML/CSS**, then
+5. **Branded alert (custom code):** Alert Box → **Tips** → **Custom HTML/CSS** (enable it), then
    paste [`streamlabs/alertbox/alert.html`](streamlabs/alertbox/alert.html), `alert.css` and
-   `alert.js` into the HTML / CSS / JS tabs, and `fields.json` into the **Custom Fields** tab.
-   Save, then **Test Donation**. Recommended settings: Layout = *text over image*, duration 8–10 s,
+   `alert.js` into the HTML / CSS / JS tabs, and `fields.json` via **Add Custom Fields**.
+   **Save Settings**, then **Test → Streamlabs → Tipping**. Recommended: Layout = *Text Over Image*, duration 8–10 s,
    animation in/out = *fade*. The custom fields let you change the accent colour, the
    "Big tip" threshold (default ₹500, adds a stronger glow + shake).
    Preview locally without Streamlabs: `node scripts/serve.mjs` →

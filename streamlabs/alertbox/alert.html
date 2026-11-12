@@ -1,18 +1,15 @@
-<!-- Sohal Gaming — Streamlabs Alert Box custom HTML (Donations / Tips).
-     Paste into: Alert Box → Donations → Enable Custom HTML/CSS → HTML tab. -->
+<!-- Sohal Gaming — Streamlabs Alert Box custom HTML (Tips).
+     Paste into: Alert Box → Tips → Custom HTML/CSS → HTML tab.
+     Streamlabs replaces {name}, {amount} and {message} (HTML-escaped) before each alert. -->
 <div class="sg-alert" id="sg-alert">
   <div class="sg-sweep"></div>
 
   <div class="sg-body">
     <div class="sg-label"><i></i><span id="sg-label-text">New tip</span></div>
     <div class="sg-line">
-      <span class="sg-name" id="sg-name"></span>
-      <span class="sg-amount" id="sg-amount"></span>
+      <span class="sg-name" id="sg-name">{name}</span>
+      <span class="sg-amount" id="sg-amount">{amount}</span>
     </div>
-    <div class="sg-message" id="sg-message">{userMessage}</div>
+    <div class="sg-message" id="sg-message">{message}</div>
   </div>
 </div>
-
-<!-- Streamlabs fills these in; the script reads name + amount from here. -->
-<div id="sg-source" hidden>{messageTemplate}</div>
-<div id="alert-image" hidden>{img}</div>
