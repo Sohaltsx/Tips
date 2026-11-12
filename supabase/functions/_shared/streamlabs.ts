@@ -2,8 +2,10 @@
 // Docs: https://dev.streamlabs.com/reference/donations-1
 // Streamlabs constraints: name 2–25 chars, letters/digits/underscore only;
 // message ≤ 255 chars; identifier groups donations by donor.
+// Apps registered now are API v2.0: the OAuth token goes in an Authorization: Bearer
+// header (v1.0 with ?access_token= rejects these tokens with 401).
 
-export const DEFAULT_DONATIONS_URL = "https://streamlabs.com/api/v1.0/donations";
+export const DEFAULT_DONATIONS_URL = "https://streamlabs.com/api/v2.0/donations";
 
 /** Make a display name Streamlabs will accept: "Rahul Kumar!" → "Rahul_Kumar". */
 export function toStreamlabsName(name: string): string {
@@ -37,12 +39,15 @@ export async function sendStreamlabsDonation(d: StreamlabsDonation): Promise<voi
     identifier: d.identifier,
     amount: d.amountRupees.toFixed(2),
     currency: d.currency,
-    access_token: token,
   });
 
   const res = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Accept: "application/json",
+      Authorization: `Bearer ${token}`,
+    },
     body: form,
     signal: AbortSignal.timeout(8000),
   });

@@ -1,6 +1,6 @@
 # Project status — Sohal Gaming Tips
 
-Last updated: **11 Nov 2026** · Launch target: **19 Nov 2026** (GTA 6 streams)
+Last updated: **12 Nov 2026** · Launch target: **19 Nov 2026** (GTA 6 streams)
 
 Pick up from **[Next up](#next-up)**. Setup details live in the [README](README.md).
 
@@ -43,34 +43,29 @@ Pick up from **[Next up](#next-up)**. Setup details live in the [README](README.
 | `verify-payment` good signature | 200 `verified: true` |
 | Webhook bad / missing signature | 400 |
 | Webhook signed, unknown order or other event | 200 ignored |
-| Webhook signed `payment.captured` for test tip | Tip marked **paid**, Streamlabs call **failed (401)** → claim released, 500 returned |
+| Signed `payment.captured` → Streamlabs alert | 200 `ok` (~2.8 s), **alert appeared in Alert Box** ✅ |
+| Same webhook resent | 200 `duplicate`, **no second alert** |
+| Message with emoji (🔥) | Order created (emoji stripped from Razorpay notes only) |
+
+### Streamlabs (done 12 Nov)
+- App **"Sohal Tips"** registered (status: Testing). Whitelist: YouTube `Sohal007`.
+  Redirect URL `http://localhost:8787/callback`.
+- OAuth token (scopes `donations.read donations.create`) obtained via
+  `scripts/streamlabs-auth.mjs` and set as `STREAMLABS_ACCESS_TOKEN` in Supabase.
+- New Streamlabs apps use **API v2.0** with `Authorization: Bearer` (v1 returns 401) — code updated.
+- Unused extra app "Sohal Gaming Tips" can be deleted under API Settings → My Apps.
 
 ---
 
-## 🔴 Blocking: Streamlabs token
-
-The "API Access Token" from Streamlabs → API Settings → API Tokens is **rejected by the
-Streamlabs API** (401 `access_denied`). We need an **OAuth token with `donations.create`**.
-
 ## Next up
 
-1. **Finish Streamlabs app registration** (Streamlabs → Account Settings → API Settings → Register App)
-   - Whitelist: platform you log in with (YouTube) + your account name; optionally add `sohal0072`.
-   - Redirect URL: `http://localhost:8787/callback`
-   - Click **Complete** → copy **Client ID** and **Client Secret** into `.env`
-     (`STREAMLABS_CLIENT_ID=`, `STREAMLABS_CLIENT_SECRET=`). Never paste them in chat.
-2. **Get the OAuth token:** `node --env-file=.env scripts/streamlabs-auth.mjs` → open the link →
-   Approve. It writes `STREAMLABS_ACCESS_TOKEN` into `.env`.
-3. **Push it:** `npx.cmd supabase secrets set --env-file .env`
-4. **Retry the test alert:** resend the signed webhook for the pending test tip
-   (order `order_TyvlCxh7CB406Q`, ₹50, name "Claude Test") → alert should show in the Alert Box.
-   Resend again → must **not** show a second alert.
-5. **Razorpay test webhook:** confirm it is added in the dashboard (Test Mode → Webhooks):
+1. **Razorpay test webhook:** confirm it is added in the dashboard (Test Mode → Webhooks):
    URL `https://pqvygvligzexbeloakkn.supabase.co/functions/v1/razorpay-webhook`,
    event `payment.captured`, secret = `RAZORPAY_WEBHOOK_SECRET` from `.env`.
-6. **Real test payment on the site:** tip ₹50 with UPI `success@razorpay` → alert in OBS within ~3 s.
+2. **Real test payment on the site:** tip ₹50 with UPI `success@razorpay` → alert in OBS within ~3 s.
    Then run the rest of the README test table (failure UPI, card, duplicate resend from
-   dashboard, abuse filter, phone layout).
+   the Razorpay dashboard, abuse filter, phone layout).
+3. **Alert Box polish:** donation alert image/sound, TTS voice, TTS min ₹50; Alert Box added in OBS.
 
 ## Before going live
 - [ ] Fill legal placeholders in `terms.html`, `privacy.html`, `refunds.html`, `contact.html`:
@@ -88,4 +83,5 @@ Streamlabs API** (401 `access_denied`). We need an **OAuth token with `donations
 - Goal bar / recent-tips overlay, monthly leaderboard, admin page.
 
 ## Clean-up notes
-- Test rows in `tips` named "Claude Test" can be deleted any time (mode = `test`).
+- Test rows in `tips` named "Claude Test" / "Sohal Test" can be deleted any time (mode = `test`).
+- Streamlabs has test donations ("Claude_Test", "Sohal_Test") in Recent Events — delete if you like.
