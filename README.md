@@ -10,7 +10,7 @@ onboard an individual YouTube streamer, so Cashfree is the default.
 - Hosting: GitHub Pages + Supabase free tier + Streamlabs free.
 - Target: **GTA 6 launch streams — 19 Nov 2026**.
 - Live at: `https://sohaltsx.github.io/Tips/`
-- **Progress & next steps: [STATUS.md](STATUS.md)**
+- **What to do next: [Next steps](#next-steps)** · progress log: [STATUS.md](STATUS.md)
 
 > This repo is **public**. Never commit secrets. `assets/config.js` holds only public settings
 > (gateway name, Cashfree mode, Razorpay key ID); every secret lives in Supabase secrets.
@@ -251,17 +251,59 @@ leetspeak; abusive names → "Anonymous"; hard cap 200 chars.
 
 **health** — trivial DB query, returns `{ ok: true }`.
 
-## Phases
+## Next steps
 
-- **Phase 1 – Core (by 19 Nov):** ✅ schema, create-order, cashfree-webhook (+ razorpay-webhook
-  fallback), health, tip + success pages, config, Pages deploy — plus the four compliance pages
-  (moved up from Phase 2 because the gateway's live review needs them).
-- **Phase 2:** keep-alive workflow (`.github/workflows/keepalive.yml` pinging `/health` every 2 days).
-- **Phase 3:** goal bar + recent-tips overlay (Supabase Realtime), monthly leaderboard, admin page.
+Where things stand (12 Nov 2026): the Cashfree code is on `main` and the site is deployed, but
+**tips won't work until the Supabase side is updated** (steps 2–3). Launch target: **19 Nov 2026**.
+Day-to-day progress notes live in [STATUS.md](STATUS.md).
 
-## Phase 1 definition of done
-- [ ] A Cashfree sandbox UPI payment shows a Streamlabs alert in OBS within ~3 s.
-- [ ] No secret in the repo (`git grep -nE "rzp_live|secret|token"` shows nothing sensitive).
-- [x] Signature verification unit-tested; [ ] idempotency tested via webhook resend.
-- [ ] Site live at `https://sohaltsx.github.io/Tips/`.
-- [x] README has real setup notes.
+### 1. Cashfree account — in progress
+- [ ] Finish sign-up at merchant.cashfree.com: brand `Sohal Gaming`, category *Content creator /
+      Influencer / Media* (never Gaming, Donation or Crowdfunding), lowest turnover range.
+- [ ] Business type **Individual** (or Sole Proprietorship), personal PAN, no GST, own bank account.
+      Describe it as voluntary **tips** from live-stream viewers (not "donations").
+- [ ] Fill the legal placeholders in `terms.html`, `privacy.html`, `refunds.html`, `contact.html`
+      (`[YOUR LEGAL NAME as on PAN]`, `[YOUR CONTACT EMAIL]`, `[YOUR CITY, STATE]`) **before**
+      submitting KYC — Cashfree reviews the website.
+- [ ] Submit KYC and ask about the "Payment Gateway @ 0%" offer (which methods, how long, what cap).
+
+### 2. Cashfree test setup (can start before KYC is approved)
+- [ ] Test mode → Developers → API Keys → in `.env`: `PAYMENT_GATEWAY=cashfree`, `CASHFREE_APP_ID`,
+      `CASHFREE_SECRET_KEY`, `CASHFREE_ENV=sandbox`, `SITE_URL=https://sohaltsx.github.io/Tips`.
+- [ ] `supabase secrets set --env-file .env`
+- [ ] Developers → Whitelisting → add `sohaltsx.github.io`.
+
+### 3. Deploy the backend
+- [ ] `supabase db push` (renames `razorpay_*_id` → `order_id` / `payment_id`, adds `gateway`).
+- [ ] Deploy all functions together, each with `--no-verify-jwt`: `create-order`,
+      `cashfree-webhook`, `razorpay-webhook`, `verify-payment`, `health`.
+
+### 4. Test in sandbox
+- [ ] `CASHFREE_SECRET_KEY=… node scripts/cashfree-webhook-test.mjs https://<ref>.supabase.co/functions/v1/cashfree-webhook` → all PASS.
+- [ ] Real sandbox tip on the live site → alert in OBS within ~3 s.
+- [ ] Rest of the [manual checklist](#manual-checklist-cashfree-sandbox): failed payment, closed
+      popup, duplicate webhook resend (only one alert), abuse filter, phone layout.
+
+### 5. Stream setup
+- [ ] Alert Box: image/sound, TTS voice, TTS min ₹50; Alert Box browser source in OBS.
+- [ ] Put the tip link (`https://sohaltsx.github.io/Tips/`) in the YouTube description, pinned
+      chat message and an on-screen QR code.
+
+### 6. Go live (once KYC is approved — target 19 Nov)
+- [ ] Production API keys → `.env` (`CASHFREE_ENV=production`) → `supabase secrets set`.
+- [ ] `CASHFREE_MODE: "production"` in `assets/config.js`; whitelist the domain in production too.
+- [ ] Remove `http://localhost:8080` from `ALLOWED_ORIGIN`.
+- [ ] ₹10 live smoke test from your own phone → real alert.
+- [ ] Clean up test rows (`delete from tips where mode = 'test';`) and Streamlabs test events.
+- [ ] Optional: close the Razorpay ticket and regenerate its test secret (it was shared in a chat).
+
+**Fallback if KYC isn't approved by launch day:** show your personal UPI QR on stream (no
+automatic alerts), or use a UPI-alert app such as Stream Alert / StreamerHub for that stream.
+
+### Later
+- **Keep-alive:** GitHub Actions workflow pinging `/health` every 2 days so the free Supabase
+  project doesn't pause.
+- **Overlays:** tip goal bar and recent-tips ticker (Supabase Realtime).
+- **Community:** monthly top-tippers leaderboard.
+- **Admin page:** see tips, re-send an alert, mark refunds.
+- **International tips:** request international payments on Cashfree.
