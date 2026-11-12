@@ -1,0 +1,174 @@
+/* Sohal Gaming — Streamlabs Alert Box custom CSS
+   Brand: #111111 · #f20d24 · #ffffff · #343434 · Rajdhani + Inter */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@500;600&family=Rajdhani:wght@600;700&display=swap");
+
+:root {
+  --sg-red: {accentColor};
+  --sg-bg: #111111;
+  --sg-line: #343434;
+  --sg-white: #ffffff;
+  --sg-muted: #b5b5b5;
+  --sg-glow: rgba(242, 13, 36, 0.55);
+  --sg-glow-soft: rgba(242, 13, 36, 0.22);
+}
+/* If accentColor is changed, derive the glows from it (older OBS keeps the brand red glow). */
+@supports (color: color-mix(in srgb, red 50%, transparent)) {
+  :root {
+    --sg-glow: color-mix(in srgb, var(--sg-red) 55%, transparent);
+    --sg-glow-soft: color-mix(in srgb, var(--sg-red) 22%, transparent);
+  }
+}
+
+html, body {
+  margin: 0;
+  background: transparent !important;
+  overflow: hidden;
+}
+
+.sg-alert {
+  --cut: 18px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: min(680px, calc(100vw - 40px));
+  margin: 20px auto;
+  padding: 22px 32px 22px 28px;
+  box-sizing: border-box;
+  color: var(--sg-white);
+  font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+  background:
+    radial-gradient(420px 160px at 0% 0%, var(--sg-glow-soft), transparent 70%),
+    linear-gradient(180deg, #161616, var(--sg-bg));
+  border-left: 6px solid var(--sg-red);
+  clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, var(--cut) 100%, 0 calc(100% - var(--cut)));
+  filter: drop-shadow(0 10px 30px rgba(0, 0, 0, 0.6));
+  animation: sg-in 0.65s cubic-bezier(0.2, 0.9, 0.25, 1.15) both;
+}
+
+/* Thin outline that follows the cut corners */
+.sg-alert::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  padding: 1px;
+  background: linear-gradient(120deg, var(--sg-red), var(--sg-line) 35%, var(--sg-line) 75%, var(--sg-red));
+  clip-path: inherit;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* Red light sweep across the card on entry */
+.sg-sweep {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.10) 45%, var(--sg-glow-soft) 50%, transparent 65%);
+  transform: translateX(-100%);
+  animation: sg-sweep 1.1s 0.35s ease-out both;
+  pointer-events: none;
+}
+
+/* ── Text ───────────────────────────────────── */
+.sg-body { min-width: 0; flex: 1; }
+
+.sg-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: "Rajdhani", "Segoe UI", sans-serif;
+  font-weight: 700;
+  font-size: 18px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--sg-red);
+  animation: sg-up 0.45s 0.25s ease-out both;
+}
+.sg-label i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--sg-red);
+  box-shadow: 0 0 10px var(--sg-red);
+  animation: sg-blink 1s steps(2, start) infinite;
+}
+
+.sg-line {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin-top: 2px;
+  font-family: "Rajdhani", "Segoe UI", sans-serif;
+  font-weight: 700;
+  line-height: 1.05;
+  text-transform: uppercase;
+  animation: sg-up 0.5s 0.35s ease-out both;
+}
+.sg-name {
+  font-size: 44px;
+  letter-spacing: 0.03em;
+  overflow-wrap: anywhere;
+}
+.sg-amount {
+  font-size: 50px;
+  color: var(--sg-red);
+  text-shadow: 0 0 20px var(--sg-glow);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.sg-message {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--sg-line);
+  font-size: 22px;
+  font-weight: 500;
+  line-height: 1.35;
+  color: var(--sg-white);
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  animation: sg-up 0.5s 0.6s ease-out both;
+}
+.sg-message:empty, .sg-message.sg-empty { display: none; }
+
+/* ── Big tip (amount ≥ bigTipAmount) ───────── */
+.sg-alert.sg-big {
+  border-left-width: 10px;
+  background:
+    radial-gradient(520px 220px at 0% 0%, var(--sg-glow), transparent 70%),
+    linear-gradient(180deg, #1a0a0c, var(--sg-bg));
+  animation: sg-in 0.65s cubic-bezier(0.2, 0.9, 0.25, 1.15) both, sg-shake 0.5s 0.7s ease-in-out both;
+}
+.sg-big .sg-amount { font-size: 64px; }
+.sg-big .sg-label { color: var(--sg-white); text-shadow: 0 0 12px var(--sg-red); }
+
+/* ── Keyframes ──────────────────────────────── */
+@keyframes sg-in {
+  from { opacity: 0; transform: translateX(-60px) skewX(-8deg); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes sg-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes sg-sweep {
+  to { transform: translateX(100%); }
+}
+@keyframes sg-blink {
+  to { visibility: hidden; }
+}
+@keyframes sg-shake {
+  0%, 100% { transform: none; }
+  20% { transform: translateX(-6px) rotate(-0.6deg); }
+  40% { transform: translateX(6px) rotate(0.6deg); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sg-alert, .sg-alert * { animation-duration: 0.01s !important; animation-iteration-count: 1 !important; }
+}

@@ -8,7 +8,7 @@ const root = resolve(import.meta.dirname, "..");
 const port = Number(process.env.PORT || 8080);
 const types = {
   ".html": "text/html; charset=utf-8", ".css": "text/css", ".js": "text/javascript",
-  ".webp": "image/webp", ".png": "image/png", ".svg": "image/svg+xml", ".ico": "image/x-icon",
+  ".webp": "image/webp", ".json": "application/json", ".png": "image/png", ".svg": "image/svg+xml", ".ico": "image/x-icon",
 };
 
 createServer(async (req, res) => {

@@ -51,6 +51,7 @@ supabase/
 tests/shared.test.ts                      unit tests (filter, signature, Streamlabs name)
 scripts/serve.mjs                         local static server (http://localhost:8080)
 scripts/webhook-test.mjs                  fake/signed webhook checks against the deployed function
+streamlabs/alertbox/                      branded Alertbox custom HTML/CSS/JS + fields + preview.html
 .github/workflows/pages.yml               deploys only *.html + assets/ to GitHub Pages
 ```
 
@@ -112,6 +113,14 @@ that stays with the signed webhook.
    `supabase secrets set --env-file .env`.
 3. Alertbox → Donations: image/GIF, sound, TTS voice (Hindi/English), **TTS min amount ₹50**.
 4. Add the Alertbox URL as a Browser Source in OBS.
+5. **Branded alert (custom code):** Alertbox → Donations → turn on **Enable Custom HTML/CSS**, then
+   paste [`streamlabs/alertbox/alert.html`](streamlabs/alertbox/alert.html), `alert.css` and
+   `alert.js` into the HTML / CSS / JS tabs, and `fields.json` into the **Custom Fields** tab.
+   Save, then **Test Donation**. Recommended settings: Layout = *text over image*, duration 8–10 s,
+   animation in/out = *fade*. The custom fields let you change the accent colour, the
+   "Big tip" threshold (default ₹500, adds a stronger glow + shake).
+   Preview locally without Streamlabs: `node scripts/serve.mjs` →
+   http://localhost:8080/streamlabs/alertbox/preview.html
 
 Streamlabs only accepts donor names of **2–25 letters/digits/underscores**, so the webhook sends a
 safe version (`Rahul Kumar` → `Rahul_Kumar`; non-Latin-only names → `Anonymous`). The original

@@ -1,0 +1,16 @@
+{
+  "accentColor": {
+    "label": "Accent colour",
+    "type": "colorpicker",
+    "value": "#f20d24"
+  },
+  "bigTipAmount": {
+    "label": "Big tip from (₹)",
+    "type": "slider",
+    "name": "",
+    "value": 500,
+    "max": 10000,
+    "min": 50,
+    "steps": 50
+  }
+}
