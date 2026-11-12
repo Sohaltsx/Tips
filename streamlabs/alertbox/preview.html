@@ -19,6 +19,12 @@
 </head>
 <body>
   <div class="controls">
+    <label>Alert
+      <select id="type" style="padding:6px 8px;background:#111;color:#fff;border:1px solid #343434;border-radius:6px">
+        <option value="tip">Tip</option>
+        <option value="sub">YouTube subscriber</option>
+      </select>
+    </label>
     <label>Name <input id="name" value="Rahul_Kumar"></label>
     <label>Amount (₹) <input id="amount" type="number" value="150" style="width:90px"></label>
     <label style="flex:1;min-width:220px">Message <input id="message" value="GTA 6 stream lets go!! 🔥 Love from Delhi"></label>
@@ -55,17 +61,22 @@
       // Streamlabs leaves {message} in place when a tip has no message.
       if (!data.message) delete data.message;
 
+      const sub = document.getElementById("type").value === "sub";
+      const html = sub ? files.subHtml : files.html;
+      const js = sub ? files.subJs : files.js;
       document.getElementById("frame").srcdoc =
         `<!doctype html><html><head><meta charset="utf-8"><style>${fill(files.css)}</style></head>` +
-        `<body>${fill(files.html, true)}<script>${fill(files.js)}<\/script></body></html>`;
+        `<body>${fill(html, true)}<script>${fill(js)}<\/script></body></html>`;
     }
 
-    Promise.all(["alert.html", "alert.css", "alert.js", "fields.json"].map(load)).then(([html, css, js, fields]) => {
-      Object.assign(files, { html, css, js, fields });
-      render();
-    });
+    Promise.all(["alert.html", "alert.css", "alert.js", "fields.json", "subscriber.html", "subscriber.js"].map(load))
+      .then(([html, css, js, fields, subHtml, subJs]) => {
+        Object.assign(files, { html, css, js, fields, subHtml, subJs });
+        render();
+      });
 
     document.getElementById("play").onclick = render;
+    document.getElementById("type").onchange = render;
     document.querySelectorAll("[data-preset]").forEach((b) => (b.onclick = () => {
       const [n, a, m] = presets[b.dataset.preset];
       document.getElementById("name").value = n;

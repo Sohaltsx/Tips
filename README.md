@@ -51,7 +51,7 @@ supabase/
 tests/shared.test.ts                      unit tests (filter, signature, Streamlabs name)
 scripts/serve.mjs                         local static server (http://localhost:8080)
 scripts/webhook-test.mjs                  fake/signed webhook checks against the deployed function
-streamlabs/alertbox/                      branded Alertbox custom HTML/CSS/JS + fields + preview.html
+streamlabs/alertbox/                      branded Alertbox custom HTML/CSS/JS (tips + YouTube subs) + fields + preview
 .github/workflows/pages.yml               deploys only *.html + assets/ to GitHub Pages
 ```
 
@@ -120,7 +120,15 @@ that stays with the signed webhook.
    animation in/out = *fade*. The custom fields let you change the accent colour, the
    "Big tip" threshold (default ₹500, adds a stronger glow + shake).
    Preview locally without Streamlabs: `node scripts/serve.mjs` →
-   http://localhost:8080/streamlabs/alertbox/preview.html
+   http://localhost:8080/streamlabs/alertbox/preview.html (pick *Tip* or *YouTube subscriber*).
+6. **YouTube subscriber alert:** Alert Box → **YouTube → Subscribers** → **Custom HTML/CSS**: paste
+   `subscriber.html` (HTML), the same `alert.css` (CSS) and `subscriber.js` (JS); Layout =
+   *Text Over Image*. Shows "NEW SUBSCRIBER", the name, and a red **Subscribe** button that flips
+   to **🔔 Subscribed**. Test with **Test → YouTube → Subscribers**.
+   If you skip Custom Fields, replace `{accentColor}` in the CSS with `#f20d24`.
+
+Only keep the Alert Box open in OBS while testing — every open copy (the **Launch** tab, a dashboard
+with Live Preview, duplicate OBS sources) plays the alert sound again.
 
 Streamlabs only accepts donor names of **2–25 letters/digits/underscores**, so the webhook sends a
 safe version (`Rahul Kumar` → `Rahul_Kumar`; non-Latin-only names → `Anonymous`). The original
