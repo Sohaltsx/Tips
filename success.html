@@ -19,12 +19,12 @@
     </header>
 
     <section class="card success">
-      <div class="tick" aria-hidden="true">✓</div>
-      <h2 id="title">Thank you!</h2>
+      <div class="tick" id="tick" aria-hidden="true">✓</div>
+      <h2 id="title" aria-live="polite">Thank you!</h2>
       <p id="detail">Your tip was received. Watch the stream — your alert will pop up in a few seconds.</p>
       <div class="actions">
         <a class="btn" id="watch" href="#" target="_blank" rel="noopener">Back to the stream</a>
-        <a class="btn ghost" href="index.html">Send another tip</a>
+        <a class="btn ghost" id="again" href="index.html">Send another tip</a>
       </div>
     </section>
   </main>
@@ -43,23 +43,85 @@
   <script>
     (function () {
       var C = window.TIP_CONFIG;
-      document.getElementById("year").textContent = new Date().getFullYear();
-      document.getElementById("watch").href = C.CHANNEL_URL;
+      var $ = function (id) { return document.getElementById(id); };
+      $("year").textContent = new Date().getFullYear();
+      $("watch").href = C.CHANNEL_URL;
+
       var tip = null;
       try {
         tip = JSON.parse(sessionStorage.getItem("lastTip") || "null");
-        sessionStorage.removeItem("lastTip");
       } catch (_) {}
-      if (tip && tip.name && tip.amount) {
-        document.getElementById("title").textContent = "Thank you, " + tip.name + "!";
-        var d = document.getElementById("detail");
-        d.textContent = "Your tip of ";
-        var b = document.createElement("span");
-        b.className = "amount";
-        b.textContent = "₹" + Number(tip.amount).toLocaleString("en-IN");
-        d.appendChild(b);
-        d.appendChild(document.createTextNode(" was received. Watch the stream — your alert will pop up in a few seconds."));
+
+      function showThanks(name, amount) {
+        try { sessionStorage.removeItem("lastTip"); } catch (_) {}
+        $("tick").textContent = "✓";
+        $("title").textContent = name ? "Thank you, " + name + "!" : "Thank you!";
+        var d = $("detail");
+        d.textContent = "";
+        if (amount) {
+          d.appendChild(document.createTextNode("Your tip of "));
+          var b = document.createElement("span");
+          b.className = "amount";
+          b.textContent = "₹" + Number(amount).toLocaleString("en-IN");
+          d.appendChild(b);
+          d.appendChild(document.createTextNode(" was received. Watch the stream — your alert will pop up in a few seconds."));
+        } else {
+          d.textContent = "Your tip was received. Watch the stream — your alert will pop up in a few seconds.";
+        }
       }
+
+      function showProblem(title, text) {
+        $("tick").textContent = "!";
+        $("title").textContent = title;
+        $("detail").textContent = text;
+        $("again").textContent = "Try again";
+      }
+
+      // Cashfree: ?order_id=… → ask the server for the real status (UI only; the
+      // on-stream alert is fired by the signed webhook, never from this page).
+      var orderId = new URLSearchParams(location.search).get("order_id");
+      if (!orderId) {
+        if (tip && tip.name && tip.amount) showThanks(tip.name, tip.amount);
+        return;
+      }
+
+      $("tick").textContent = "…";
+      $("title").textContent = "Confirming your payment…";
+      $("detail").textContent = "This usually takes a few seconds.";
+
+      var attempts = 0;
+      function check() {
+        attempts++;
+        fetch(C.SUPABASE_FUNCTIONS_URL + "/verify-payment", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ order_id: orderId })
+        })
+          .then(function (res) { return res.json().catch(function () { return {}; }).then(function (d) { return { res: res, d: d }; }); })
+          .then(function (r) {
+            var d = r.d;
+            if (r.res.ok && d.verified) {
+              return showThanks((tip && tip.name) || d.name, (tip && tip.amount) || d.amount);
+            }
+            if (r.res.ok && d.status === "ACTIVE" && attempts < 6) return setTimeout(check, 2500);
+            if (r.res.ok) {
+              return showProblem("Payment not completed",
+                "We didn't receive this payment. If money was debited, it will be refunded automatically " +
+                "by your bank within 5–7 working days. Reference: " + orderId);
+            }
+            if (r.res.status === 400) {
+              return showProblem("Payment not found", "We couldn't find this payment. Reference: " + orderId);
+            }
+            throw new Error("server");
+          })
+          .catch(function () {
+            if (attempts < 4) return setTimeout(check, 2500);
+            showProblem("Couldn't confirm yet",
+              "If your payment went through, your alert will still show on stream. " +
+              "For any problem, contact us with this reference: " + orderId);
+          });
+      }
+      check();
     })();
   </script>
 </body>

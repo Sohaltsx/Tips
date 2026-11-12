@@ -26,7 +26,7 @@ Pick up from **[Next up](#next-up)**. Setup details live in the [README](README.
 - Secrets set: `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`,
   `ALLOWED_ORIGIN`, `MIN_AMOUNT`, `MAX_AMOUNT`, `STREAMLABS_ACCESS_TOKEN` (⚠ wrong kind — see below).
 
-### Razorpay (Test Mode)
+### Razorpay (Test Mode) — now the fallback
 - Test keys generated; key ID in `assets/config.js`, secret only in Supabase + local `.env`.
 - Webhook secret generated and stored in `.env` + Supabase.
 - Support ticket submitted to fix the business category (was "Gaming → Game developer",
@@ -57,26 +57,49 @@ Pick up from **[Next up](#next-up)**. Setup details live in the [README](README.
 
 ---
 
+## Switched to Cashfree (12 Nov)
+
+Razorpay would not onboard an individual YouTube streamer, so **Cashfree is now the default
+gateway**. Razorpay code is kept as a fallback (`PAYMENT_GATEWAY=razorpay`).
+
+What changed (branch `ccr-0d80feb9-yhl5ui`, not yet on `main`):
+- New `cashfree-webhook` function + shared `_shared/cashfree.ts` and `_shared/fulfil.ts`
+  (mark paid → claim alert once → Streamlabs, shared by both webhooks).
+- `create-order` / `verify-payment` support both gateways (`PAYMENT_GATEWAY` secret).
+- Tip page asks for a **mobile number** (Cashfree requires it; sent to Cashfree only, never stored).
+- Thank-you page now checks the real order status (`PAID` / not completed).
+- Migration `20261112000000_gateway_agnostic.sql`: `razorpay_order_id` → `order_id`,
+  `razorpay_payment_id` → `payment_id`, new `gateway` column.
+- Terms / Privacy / Refunds / Contact now name Cashfree.
+- Tested here: 13 unit tests; Edge Functions type-check; the real `cashfree-webhook` against a
+  mock DB + Streamlabs (bad signature, unknown order, wrong amount, Streamlabs down → retry,
+  duplicate and concurrent deliveries → exactly one alert); tip page + thank-you page in a
+  browser with Cashfree mocked. **Not yet tested against real Cashfree sandbox.**
+
 ## Next up
 
-1. **Razorpay test webhook:** confirm it is added in the dashboard (Test Mode → Webhooks):
-   URL `https://pqvygvligzexbeloakkn.supabase.co/functions/v1/razorpay-webhook`,
-   event `payment.captured`, secret = `RAZORPAY_WEBHOOK_SECRET` from `.env`.
-2. **Real test payment on the site:** tip ₹50 with UPI `success@razorpay` → alert in OBS within ~3 s.
-   Then run the rest of the README test table (failure UPI, card, duplicate resend from
-   the Razorpay dashboard, abuse filter, phone layout).
-3. **Alert Box polish:** donation alert image/sound, TTS voice, TTS min ₹50; Alert Box added in OBS.
+1. **Cashfree account:** sign up at merchant.cashfree.com as *Individual (unregistered)*
+   (PAN + Aadhaar + bank). Category: content creator / live-stream tips. Start KYC now.
+2. **Cashfree test keys:** Test mode → Developers → API Keys → put in `.env`:
+   `PAYMENT_GATEWAY=cashfree`, `CASHFREE_APP_ID`, `CASHFREE_SECRET_KEY`, `CASHFREE_ENV=sandbox`,
+   `SITE_URL=https://sohaltsx.github.io/Tips` → `supabase secrets set --env-file .env`.
+   Developers → Whitelisting → add `sohaltsx.github.io`.
+3. **Deploy:** `supabase db push`, then deploy `create-order`, `cashfree-webhook`,
+   `razorpay-webhook`, `verify-payment`, `health` (all `--no-verify-jwt`). Merge the branch to
+   `main` so Pages publishes the new tip page.
+4. **Check:** `CASHFREE_SECRET_KEY=… node scripts/cashfree-webhook-test.mjs <url>` (all PASS),
+   then a real sandbox tip → alert in OBS within ~3 s. Then the README test table.
+5. **Alert Box polish:** donation alert image/sound, TTS voice, TTS min ₹50; Alert Box added in OBS.
 
 ## Before going live
 - [ ] Fill legal placeholders in `terms.html`, `privacy.html`, `refunds.html`, `contact.html`:
       `[YOUR LEGAL NAME as on PAN]`, `[YOUR CONTACT EMAIL]`, `[YOUR CITY, STATE]`.
 - [ ] Confirm YouTube handle in `assets/config.js` (`CHANNEL_URL`, currently `@Sohal007`) and `contact.html`.
-- [ ] Razorpay support ticket resolved → category = content creator → complete KYC.
-- [ ] Live mode: live keys + live webhook (its own secret) → update Supabase secrets and
-      `RAZORPAY_KEY_ID` in `config.js`.
+- [ ] Cashfree KYC approved → Production API keys → `CASHFREE_ENV=production` in Supabase secrets
+      and `CASHFREE_MODE: "production"` in `assets/config.js`; whitelist the domain in production.
 - [ ] Remove `http://localhost:8080` from `ALLOWED_ORIGIN`.
 - [ ] ₹10 live smoke test from your own phone.
-- [ ] Optional: regenerate the Razorpay test key secret (it was shared in a chat).
+- [ ] Optional: close the Razorpay ticket / regenerate the Razorpay test secret (it was shared in a chat).
 
 ## Later (Phase 2–3)
 - Keep-alive workflow pinging `/health` every 2 days.

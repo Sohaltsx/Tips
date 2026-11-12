@@ -37,8 +37,8 @@ jobs:
 
       - name: Refuse to deploy secrets
         run: |
-          # Key IDs (rzp_test_/rzp_live_) are public; block things that look like real secrets.
-          if grep -rIE "service_role|eyJhbGciOi|RAZORPAY_KEY_SECRET|RAZORPAY_WEBHOOK_SECRET|STREAMLABS_ACCESS_TOKEN|key_secret" _site; then
+          # Key/App IDs are public; block things that look like real secrets.
+          if grep -rIE "service_role|eyJhbGciOi|RAZORPAY_KEY_SECRET|RAZORPAY_WEBHOOK_SECRET|STREAMLABS_ACCESS_TOKEN|key_secret|CASHFREE_SECRET_KEY|cfsk_ma_" _site; then
             echo "Possible secret in site files — aborting." && exit 1
           fi
 

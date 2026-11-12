@@ -1,17 +1,19 @@
 # Sohal Gaming Tips 💸
 
 A personal, zero-commission tipping page for the **Sohal Gaming** YouTube live streams.
-Viewers tip via **Razorpay** (UPI, cards, net banking, wallets), and each successful tip
+Viewers tip via **Cashfree** (UPI, cards, net banking, wallets), and each successful tip
 fires an on-stream **Streamlabs alert** with the viewer's name, amount and message (incl. TTS).
+Razorpay is still supported as a fallback (`PAYMENT_GATEWAY=razorpay`), but Razorpay would not
+onboard an individual YouTube streamer, so Cashfree is the default.
 
-- Only cost: Razorpay's gateway fee (~2% + GST domestic).
+- Only cost: the gateway fee (~2% + GST domestic).
 - Hosting: GitHub Pages + Supabase free tier + Streamlabs free.
 - Target: **GTA 6 launch streams — 19 Nov 2026**.
 - Live at: `https://sohaltsx.github.io/Tips/`
 - **Progress & next steps: [STATUS.md](STATUS.md)**
 
-> This repo is **public**. Never commit secrets. Only the Razorpay **key ID** (public by design)
-> goes in `assets/config.js`; everything else lives in Supabase secrets.
+> This repo is **public**. Never commit secrets. `assets/config.js` holds only public settings
+> (gateway name, Cashfree mode, Razorpay key ID); every secret lives in Supabase secrets.
 
 ---
 
@@ -19,38 +21,44 @@ fires an on-stream **Streamlabs alert** with the viewer's name, amount and messa
 
 ```
 Viewer ──► GitHub Pages (index.html)
-              │ 1. POST { name, amount, message }
+              │ 1. POST { name, amount, message, phone }
               ▼
         Edge Function: create-order
-              │ 2. validate + rate-limit → Razorpay order (receipt = tip id) → insert tip (pending)
+              │ 2. validate + rate-limit → insert tip (pending) → Cashfree order (order_id = tip id,
+              │    notify_url = cashfree-webhook) → payment_session_id
               ▼
-        Razorpay Checkout popup ──► viewer pays
-              │ 3. webhook: payment.captured
+        Cashfree Checkout popup ──► viewer pays ──► success.html?order_id=… (asks verify-payment)
+              │ 3. webhook: PAYMENT_SUCCESS_WEBHOOK
               ▼
-        Edge Function: razorpay-webhook
-              │ 4. verify HMAC → check amount → mark paid → atomically claim alert → filter
+        Edge Function: cashfree-webhook
+              │ 4. verify signature → check amount → mark paid → atomically claim alert → filter
               ▼
-        Streamlabs POST /api/v1.0/donations ──► Alertbox in OBS (alert + TTS)
+        Streamlabs POST /api/v2.0/donations ──► Alertbox in OBS (alert + TTS)
 ```
 
 **The webhook is the single source of truth.** Alerts fire only after a signature-verified
-`payment.captured` event — never from the browser. `success.html` is UI only.
+success webhook, never from the browser. `success.html` and `verify-payment` are UI only.
+
+The viewer's mobile number is required by Cashfree. It is sent to Cashfree only and is
+**not stored** in our database.
 
 ## Project layout
 
 ```
 index.html  success.html                 tip page + thank-you page
-terms.html  privacy.html  refunds.html  contact.html   (needed for Razorpay website review)
+terms.html  privacy.html  refunds.html  contact.html   (needed for the gateway's website review)
 assets/     config.js (public config) · app.js · style.css · logo.webp
 supabase/
   migrations/20261111000000_init.sql      tips + rate_limits tables, RLS on, no public policies
-  config.toml                             verify_jwt = false for all three functions
+  migrations/20261112000000_gateway_agnostic.sql   order_id / payment_id / gateway columns
+  config.toml                             verify_jwt = false for every function
   functions/
-    create-order/      razorpay-webhook/      health/
-    _shared/  cors.ts · db.ts · filter.ts · signature.ts · streamlabs.ts
-tests/shared.test.ts                      unit tests (filter, signature, Streamlabs name)
+    create-order/   cashfree-webhook/   razorpay-webhook/   verify-payment/   health/
+    _shared/  cashfree.ts · cors.ts · db.ts · filter.ts · fulfil.ts · signature.ts · streamlabs.ts
+tests/shared.test.ts                      unit tests (filter, signatures, phone, Streamlabs name)
 scripts/serve.mjs                         local static server (http://localhost:8080)
-scripts/webhook-test.mjs                  fake/signed webhook checks against the deployed function
+scripts/cashfree-webhook-test.mjs         fake/signed webhook checks against the deployed Cashfree webhook
+scripts/webhook-test.mjs                  same for the Razorpay webhook (fallback)
 streamlabs/alertbox/                      branded Alertbox custom HTML/CSS/JS (tips + YouTube subs) + fields + preview
 .github/workflows/pages.yml               deploys only *.html + assets/ to GitHub Pages
 ```
@@ -62,7 +70,9 @@ Brand: `#111111` background · `#f20d24` accent · `#ffffff` text · `#343434` l
 ## Setup
 
 ### 0. Before you start (do these first — they take the longest)
-- **Razorpay KYC**: sign up as *Individual / Unregistered business* (personal PAN). Live activation
+- **Cashfree KYC**: sign up at merchant.cashfree.com as **Individual (unregistered)** with personal
+  PAN, Aadhaar and bank account; describe the business as *content creator / digital tips for
+  live streams* and give the site URL. Live activation
   includes a website review that checks the Terms / Privacy / Refunds / Contact pages, so deploy the
   site and **fill in the placeholders** in those pages (`[YOUR LEGAL NAME as on PAN]`,
   `[YOUR CONTACT EMAIL]`, `[YOUR CITY, STATE]`) before submitting.
@@ -80,27 +90,42 @@ Brand: `#111111` background · `#f20d24` accent · `#ffffff` text · `#343434` l
    supabase link --project-ref <ref>
    ```
 
-### 2. Razorpay (Test Mode)
-1. Dashboard → switch to **Test Mode** → Account & Settings → API Keys → generate `rzp_test_…` keys.
-2. Settings → Payment capture → make sure payments are **auto-captured**.
-3. Webhooks → Add: URL `https://<ref>.supabase.co/functions/v1/razorpay-webhook`,
-   event **`payment.captured`**, set a strong secret.
+### 2. Cashfree (Test / sandbox)
+1. Merchant Dashboard → switch to **Test** → Developers → API Keys → generate the
+   **App ID** and **Secret Key**. Put them in `.env` as `CASHFREE_APP_ID` / `CASHFREE_SECRET_KEY`,
+   with `CASHFREE_ENV=sandbox`.
+2. Developers → **Whitelisting** → add the site domain `sohaltsx.github.io` (Cashfree only opens
+   Checkout on whitelisted domains; production needs this too).
+3. Webhooks: nothing to do. `create-order` sets each order's `notify_url` to
+   `https://<ref>.supabase.co/functions/v1/cashfree-webhook`. Optionally also add that URL under
+   Developers → Webhooks (Payment, success event) as a backup; duplicates are harmless.
+   The webhook is signed with the **Secret Key**, so there is no separate webhook secret.
+
+(Razorpay fallback: Test Mode → API Keys → `rzp_test_…` keys; auto-capture on; webhook
+`…/functions/v1/razorpay-webhook`, event `payment.captured`, with its own secret. Then set
+`PAYMENT_GATEWAY=razorpay` in both `.env` and `assets/config.js`.)
 
 ### 3. Secrets & deploy functions
 ```bash
 cp .env.example .env      # fill in values; .env is git-ignored
 supabase secrets set --env-file .env
+supabase db push                      # applies the gateway_agnostic migration
 supabase functions deploy create-order --no-verify-jwt
+supabase functions deploy cashfree-webhook --no-verify-jwt
 supabase functions deploy razorpay-webhook --no-verify-jwt
 supabase functions deploy health --no-verify-jwt
 supabase functions deploy verify-payment --no-verify-jwt
 ```
 (On Windows PowerShell, use `npx.cmd supabase …` if `npx` is blocked by the execution policy.)
 
-`verify-payment` checks the Checkout signature `HMAC-SHA256(order_id|payment_id, key_secret)` so the
-page only shows "thank you" for a genuine payment. It never marks a tip paid or fires an alert —
+Deploy the migration and **all** functions together: the migration renames
+`razorpay_order_id` → `order_id` and `razorpay_payment_id` → `payment_id`.
+
+`verify-payment` lets `success.html` show the right message. For Cashfree it asks Cashfree for the
+order status (`PAID` / `ACTIVE` / `EXPIRED`); for Razorpay it checks the Checkout signature
+`HMAC-SHA256(order_id|payment_id, key_secret)`. It never marks a tip paid or fires an alert —
 that stays with the signed webhook.
-`--no-verify-jwt` is required: the browser, Razorpay and the keep-alive ping have no Supabase JWT.
+`--no-verify-jwt` is required: the browser, the gateways and the keep-alive ping have no Supabase JWT.
 (`config.toml` sets the same thing.) Each function does its own checks instead.
 
 ### 4. Streamlabs
@@ -136,17 +161,18 @@ name is kept in the database.
 
 ### 5. Site config & GitHub Pages
 1. Edit [`assets/config.js`](assets/config.js): set `SUPABASE_FUNCTIONS_URL` (your ref),
-   `RAZORPAY_KEY_ID` (`rzp_test_…`), and `CHANNEL_URL`.
+   `PAYMENT_GATEWAY` (`cashfree`), `CASHFREE_MODE` (`sandbox`), and `CHANNEL_URL`.
 2. GitHub repo → Settings → Pages → Source: **GitHub Actions**.
 3. Push to `main`. The workflow publishes only the HTML pages and `assets/`.
 
 ### Going live
-1. After KYC approval: switch the Razorpay dashboard to **Live Mode**, generate live keys, add the
-   same webhook (live mode has its own webhook + secret).
-2. Update `.env` (`RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`) →
+1. After KYC approval: switch the Cashfree dashboard to **Production**, generate live API keys,
+   and whitelist `sohaltsx.github.io` there too.
+2. Update `.env` (`CASHFREE_APP_ID`, `CASHFREE_SECRET_KEY`, `CASHFREE_ENV=production`) →
    `supabase secrets set --env-file .env`.
-3. Update `RAZORPAY_KEY_ID` in `assets/config.js` to `rzp_live_…` and push. (The key ID is public;
-   the Pages workflow refuses to deploy only if a real secret pattern shows up in the site files.)
+3. Set `CASHFREE_MODE: "production"` in `assets/config.js` and push. (The server's reply also tells
+   the page which mode to use. The Pages workflow refuses to deploy if a real secret pattern shows
+   up in the site files.)
 4. Remove `http://localhost:8080` from `ALLOWED_ORIGIN`.
 5. Pay ₹10 from your own phone and confirm the alert.
 6. Later: request **International Payments** activation.
@@ -165,20 +191,26 @@ To test `create-order` from localhost, keep `http://localhost:8080` in `ALLOWED_
 
 ### Against the deployed webhook
 ```bash
-RAZORPAY_WEBHOOK_SECRET=<secret> node scripts/webhook-test.mjs https://<ref>.supabase.co/functions/v1/razorpay-webhook
+CASHFREE_SECRET_KEY=<secret> node scripts/cashfree-webhook-test.mjs https://<ref>.supabase.co/functions/v1/cashfree-webhook
 ```
-(PowerShell: `$env:RAZORPAY_WEBHOOK_SECRET="<secret>"; node scripts/webhook-test.mjs <url>`)
+(PowerShell: `$env:CASHFREE_SECRET_KEY="<secret>"; node scripts/cashfree-webhook-test.mjs <url>`)
 Checks: bad/missing signature → 400; signed unknown order → 200 ignored; other events → 200 ignored.
+For the Razorpay fallback: `RAZORPAY_WEBHOOK_SECRET=<secret> node scripts/webhook-test.mjs <url>`.
 
-### Manual checklist (Razorpay Test Mode)
+### Manual checklist (Cashfree sandbox)
+
+Use the test UPI IDs / cards shown in the sandbox Checkout and in Cashfree's docs
+(Payments → Test data). Any valid-looking 10-digit mobile works in sandbox.
 
 | Test | How | Expected |
 |---|---|---|
-| UPI success | UPI ID `success@razorpay` | Tip = paid, alert in OBS within ~3 s |
-| UPI failure | UPI ID `failure@razorpay` | Tip stays pending, no alert |
-| Card success | `4100 2800 0000 1007`, any CVV, future date | Alert shows |
-| Duplicate webhook | Razorpay Dashboard → Webhooks → Resend a delivered event | Only ONE alert |
-| Fake webhook | `scripts/webhook-test.mjs` | 400, no alert |
+| UPI success | Sandbox success UPI ID | Thank-you page, tip = paid, alert in OBS within ~3 s |
+| UPI failure | Sandbox failure UPI ID | "Payment not completed", tip stays pending, no alert |
+| Close popup | Close Checkout without paying | Error on the tip page, no alert |
+| Card success | Sandbox test card | Alert shows |
+| Duplicate webhook | Dashboard → Developers → Webhooks → logs → resend | Only ONE alert |
+| Fake webhook | `scripts/cashfree-webhook-test.mjs` | 400, no alert |
+| Bad phone | `12345` | Rejected on the page and by `create-order` (400) |
 | Bad input | Amount 5, 300-char message | Rejected by `create-order` (400) |
 | Abuse filter | Message with blocked words / links | Masked/removed in the alert |
 | Mobile | Open the page on a phone | Layout OK, Checkout opens |
@@ -197,12 +229,20 @@ from tips order by created_at desc limit 20;
 **create-order** — CORS limited to `ALLOWED_ORIGIN` (comma-separated); name 1–30 chars, whole
 rupees within `MIN_AMOUNT`–`MAX_AMOUNT`, message ≤ 200 chars; max 5 orders per IP per minute
 (SHA-256-hashed IP in `rate_limits`, rows pruned after an hour); generates the tip id first,
-creates the Razorpay order with `receipt = tip id`, then inserts the pending tip.
+then for Cashfree: requires a valid 10-digit Indian mobile (`+91`/`0` prefixes accepted), inserts
+the pending tip, then creates the Cashfree order with `order_id = tip id`, `return_url` =
+`SITE_URL/success.html?order_id={order_id}` and `notify_url` = the cashfree-webhook URL. For
+Razorpay: creates the order with `receipt = tip id`, then inserts the pending tip.
 
-**razorpay-webhook** — verifies `X-Razorpay-Signature` over the raw body (constant-time); handles
-only `payment.captured`; rejects amount/currency mismatches; marks the tip paid; claims the alert
-with a single `UPDATE … WHERE alert_sent = false` so concurrent retries can't double-alert. If the
-Streamlabs call fails, the claim is released and the function returns 500 so Razorpay retries.
+**cashfree-webhook** — verifies `x-webhook-signature` =
+`base64(HMAC-SHA256(x-webhook-timestamp + rawBody, CASHFREE_SECRET_KEY))` (constant-time); handles
+only `PAYMENT_SUCCESS_WEBHOOK` with `payment_status = SUCCESS`; rejects amount/currency mismatches;
+then the shared `fulfil.ts` step: mark the tip paid, claim the alert with a single
+`UPDATE … WHERE alert_sent = false` so concurrent retries can't double-alert, send to Streamlabs.
+If Streamlabs fails, the claim is released and the function returns 500 so the gateway retries.
+
+**razorpay-webhook** — same, for Razorpay: verifies `X-Razorpay-Signature` over the raw body and
+handles only `payment.captured`.
 
 **filter** — strips HTML, URLs, @mentions, control chars; caps repeated characters at 3 and emoji
 at 5; masks words from `BLOCK_ANYWHERE` / `BLOCK_WORDS` in
@@ -213,14 +253,14 @@ leetspeak; abusive names → "Anonymous"; hard cap 200 chars.
 
 ## Phases
 
-- **Phase 1 – Core (by 19 Nov):** ✅ schema, create-order, razorpay-webhook, health, tip + success
-  pages, config, Pages deploy — plus the four compliance pages (moved up from Phase 2 because
-  Razorpay's live review needs them).
+- **Phase 1 – Core (by 19 Nov):** ✅ schema, create-order, cashfree-webhook (+ razorpay-webhook
+  fallback), health, tip + success pages, config, Pages deploy — plus the four compliance pages
+  (moved up from Phase 2 because the gateway's live review needs them).
 - **Phase 2:** keep-alive workflow (`.github/workflows/keepalive.yml` pinging `/health` every 2 days).
 - **Phase 3:** goal bar + recent-tips overlay (Supabase Realtime), monthly leaderboard, admin page.
 
 ## Phase 1 definition of done
-- [ ] A test payment with `success@razorpay` shows a Streamlabs alert in OBS within ~3 s.
+- [ ] A Cashfree sandbox UPI payment shows a Streamlabs alert in OBS within ~3 s.
 - [ ] No secret in the repo (`git grep -nE "rzp_live|secret|token"` shows nothing sensitive).
 - [x] Signature verification unit-tested; [ ] idempotency tested via webhook resend.
 - [ ] Site live at `https://sohaltsx.github.io/Tips/`.

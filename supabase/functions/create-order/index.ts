@@ -1,8 +1,14 @@
-// POST /create-order  { name, amount, message }  →  { order_id, amount, currency, key_id, tip_id }
-// amount is in whole rupees; Razorpay works in paise.
+// POST /create-order  { name, amount, message, phone? }
+//
+// Cashfree (default):  → { gateway: "cashfree", mode, order_id, payment_session_id, amount, tip_id }
+// Razorpay:            → { gateway: "razorpay", order_id, amount (paise), currency, key_id, tip_id }
+//
+// amount in the request is whole rupees. phone is required for Cashfree (Cashfree needs a
+// customer phone); it is passed to Cashfree only and never stored in our database.
 
 import { corsHeaders, isOriginAllowed, json } from "../_shared/cors.ts";
-import { db, razorpayMode } from "../_shared/db.ts";
+import { activeGateway, db, razorpayMode } from "../_shared/db.ts";
+import { cashfreeEnv, createCashfreeOrder, normalizeIndianPhone } from "../_shared/cashfree.ts";
 import { cleanText, MAX_MESSAGE_LENGTH, MAX_NAME_LENGTH } from "../_shared/filter.ts";
 import { sha256Hex } from "../_shared/signature.ts";
 
@@ -50,9 +56,10 @@ interface ValidInput {
   name: string;
   message: string;
   amount: number;
+  phone: string | null;
 }
 
-function validate(body: unknown): { ok: true; value: ValidInput } | { ok: false; error: string } {
+function validate(body: unknown, needPhone: boolean): { ok: true; value: ValidInput } | { ok: false; error: string } {
   if (!body || typeof body !== "object") return { ok: false, error: "Invalid request." };
   const b = body as Record<string, unknown>;
 
@@ -77,7 +84,13 @@ function validate(body: unknown): { ok: true; value: ValidInput } | { ok: false;
   if (amount < MIN_AMOUNT || amount > MAX_AMOUNT) {
     return { ok: false, error: `Amount must be between ₹${MIN_AMOUNT} and ₹${MAX_AMOUNT}.` };
   }
-  return { ok: true, value: { name, message, amount } };
+
+  let phone: string | null = null;
+  if (needPhone) {
+    phone = normalizeIndianPhone(b.phone);
+    if (!phone) return { ok: false, error: "Please enter a valid 10-digit Indian mobile number." };
+  }
+  return { ok: true, value: { name, message, amount, phone } };
 }
 
 Deno.serve(async (req) => {
@@ -95,18 +108,87 @@ Deno.serve(async (req) => {
     return json({ error: "Invalid JSON." }, 400, cors);
   }
 
-  const v = validate(body);
+  const gateway = activeGateway();
+  const v = validate(body, gateway === "cashfree");
   if (!v.ok) return json({ error: v.error }, 400, cors);
-  const { name, message, amount } = v.value;
+  const { name, message, amount, phone } = v.value;
 
   if (await isRateLimited(clientIp(req))) {
     return json({ error: "Too many attempts. Please wait a minute and try again." }, 429, cors);
   }
 
-  const keyId = Deno.env.get("RAZORPAY_KEY_ID")!;
-  const keySecret = Deno.env.get("RAZORPAY_KEY_SECRET")!;
   const tipId = crypto.randomUUID();
   const amountPaise = amount * 100;
+  const fail = () => json({ error: "Could not start the payment. Please try again." }, 502, cors);
+
+  async function insertTip(orderId: string, mode: "test" | "live"): Promise<boolean> {
+    const { error } = await db().from("tips").insert({
+      id: tipId,
+      name,
+      message: message || null,
+      amount_paise: amountPaise,
+      currency: CURRENCY,
+      gateway,
+      order_id: orderId,
+      status: "pending",
+      mode,
+    });
+    if (error) console.error("insert tip failed", error);
+    return !error;
+  }
+
+  // ── Cashfree ─────────────────────────────────────────────────────────
+  if (gateway === "cashfree") {
+    const env = cashfreeEnv();
+    const siteUrl = (Deno.env.get("SITE_URL") ?? "").replace(/\/$/, "");
+    const supabaseUrl = (Deno.env.get("SUPABASE_URL") ?? "").replace(/\/$/, "");
+
+    // Insert first (order_id = tip id), so a webhook can never arrive for an unknown tip.
+    if (!(await insertTip(tipId, env === "production" ? "live" : "test"))) {
+      return json({ error: "Could not start the payment. Please try again." }, 500, cors);
+    }
+
+    let order;
+    try {
+      order = await createCashfreeOrder({
+        orderId: tipId,
+        amountRupees: amount,
+        currency: CURRENCY,
+        customerName: name,
+        customerPhone: phone!,
+        note: message ? `Tip from ${name}: ${message}` : `Tip from ${name}`,
+        returnUrl: siteUrl.startsWith("https://") ? `${siteUrl}/success.html?order_id={order_id}` : undefined,
+        notifyUrl: supabaseUrl.startsWith("https://") ? `${supabaseUrl}/functions/v1/cashfree-webhook` : undefined,
+      });
+    } catch (e) {
+      console.error("cashfree order failed", e);
+      await db().from("tips").update({ status: "failed" }).eq("id", tipId);
+      return fail();
+    }
+    if (!order?.payment_session_id) {
+      console.error("cashfree order without payment_session_id", order);
+      await db().from("tips").update({ status: "failed" }).eq("id", tipId);
+      return fail();
+    }
+
+    return json(
+      {
+        gateway,
+        mode: env,
+        order_id: order.order_id,
+        payment_session_id: order.payment_session_id,
+        amount,
+        currency: CURRENCY,
+        tip_id: tipId,
+      },
+      200,
+      cors,
+    );
+  }
+
+  // ── Razorpay ─────────────────────────────────────────────────────────
+  const keyId = Deno.env.get("RAZORPAY_KEY_ID")!;
+  const keySecret = Deno.env.get("RAZORPAY_KEY_SECRET")!;
 
   // 1) Create the Razorpay order (receipt = our tip id, ≤ 40 chars)
   const rzpRes = await fetch("https://api.razorpay.com/v1/orders", {
@@ -131,28 +213,17 @@ Deno.serve(async (req) => {
 
   if (!rzpRes || !rzpRes.ok) {
     console.error("razorpay order error", rzpRes?.status, await rzpRes?.text().catch(() => ""));
-    return json({ error: "Could not start the payment. Please try again." }, 502, cors);
+    return fail();
   }
   const order = await rzpRes.json();
 
   // 2) Store the pending tip
-  const { error } = await db().from("tips").insert({
-    id: tipId,
-    name,
-    message: message || null,
-    amount_paise: amountPaise,
-    currency: CURRENCY,
-    razorpay_order_id: order.id,
-    status: "pending",
-    mode: razorpayMode(),
-  });
-  if (error) {
-    console.error("insert tip failed", error);
+  if (!(await insertTip(order.id, razorpayMode()))) {
     return json({ error: "Could not start the payment. Please try again." }, 500, cors);
   }
 
   return json(
-    { order_id: order.id, amount: amountPaise, currency: CURRENCY, key_id: keyId, tip_id: tipId },
+    { gateway, order_id: order.id, amount: amountPaise, currency: CURRENCY, key_id: keyId, tip_id: tipId },
     200,
     cors,
   );

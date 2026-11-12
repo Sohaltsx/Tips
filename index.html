@@ -33,6 +33,12 @@
                placeholder="Shown on stream" required>
       </div>
 
+      <div class="field" id="phone-field" hidden>
+        <label for="phone">Mobile <small>payment receipt only · not shown</small></label>
+        <input id="phone" name="phone" type="tel" inputmode="tel" maxlength="16"
+               autocomplete="tel-national" placeholder="10-digit mobile number">
+      </div>
+
       <div class="field">
         <div class="label" id="amount-label">Amount</div>
         <div class="quick" id="quick" role="group" aria-labelledby="amount-label"></div>
@@ -56,7 +62,7 @@
         <span class="spinner" aria-hidden="true"></span>
         <span id="tip-btn-text">Tip</span>
       </button>
-      <p class="secure">🔒 Secure payment by Razorpay · UPI · Cards · Netbanking · Wallets</p>
+      <p class="secure">🔒 Secure payment by <span id="gateway-name">Cashfree</span> · UPI · Cards · Netbanking · Wallets</p>
     </form>
   </main>
 
@@ -71,7 +77,6 @@
   </footer>
 
   <script src="assets/config.js"></script>
-  <script src="https://checkout.razorpay.com/v1/checkout.js" defer></script>
   <script src="assets/app.js" defer></script>
 </body>
 </html>

@@ -1,4 +1,5 @@
-// End-to-end checks against the DEPLOYED razorpay-webhook function.
+// End-to-end checks against the DEPLOYED razorpay-webhook function (Razorpay fallback).
+// For Cashfree use scripts/cashfree-webhook-test.mjs.
 //
 //   RAZORPAY_WEBHOOK_SECRET=... node scripts/webhook-test.mjs https://<ref>.supabase.co/functions/v1/razorpay-webhook
 //

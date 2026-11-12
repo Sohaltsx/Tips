@@ -14,6 +14,15 @@ export function db(): SupabaseClient {
   return client;
 }
 
+export type Gateway = "cashfree" | "razorpay";
+
+/** Which gateway new tips use. Set PAYMENT_GATEWAY in Supabase secrets (default: cashfree). */
+export function activeGateway(): Gateway {
+  return (Deno.env.get("PAYMENT_GATEWAY") ?? "cashfree").trim().toLowerCase() === "razorpay"
+    ? "razorpay"
+    : "cashfree";
+}
+
 export function razorpayMode(): "test" | "live" {
   return (Deno.env.get("RAZORPAY_KEY_ID") ?? "").startsWith("rzp_live_") ? "live" : "test";
 }

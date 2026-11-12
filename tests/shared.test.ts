@@ -4,7 +4,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { cleanText, containsAbuse, filterMessage, filterName } from "../supabase/functions/_shared/filter.ts";
-import { hmacSha256Hex, timingSafeEqual, verifyRazorpaySignature } from "../supabase/functions/_shared/signature.ts";
+import {
+  hmacSha256Base64,
+  hmacSha256Hex,
+  timingSafeEqual,
+  verifyCashfreeSignature,
+  verifyRazorpaySignature,
+} from "../supabase/functions/_shared/signature.ts";
+import { cashfreeSafe, normalizeIndianPhone } from "../supabase/functions/_shared/cashfree.ts";
 
 // Streamlabs name helper lives in streamlabs.ts which touches Deno.env only inside a function,
 // so it imports fine under Node.
@@ -87,4 +94,36 @@ test("known HMAC vector", async () => {
   assert.equal(timingSafeEqual("abc", "abc"), true);
   assert.equal(timingSafeEqual("abc", "abd"), false);
   assert.equal(timingSafeEqual("abc", "abcd"), false);
+});
+
+test("cashfree webhook signature: base64(HMAC(timestamp + rawBody, client secret))", async () => {
+  const { createHmac } = await import("node:crypto");
+  const secret = "cfsk_test_secret";
+  const ts = "1731400000000";
+  const body = JSON.stringify({ type: "PAYMENT_SUCCESS_WEBHOOK", data: { order: { order_id: "abc" } } });
+  // Reference: exactly what Cashfree's official Node SDK computes
+  const sig = createHmac("sha256", secret).update(ts + body).digest("base64");
+  assert.equal(await hmacSha256Base64(secret, ts + body), sig);
+  assert.equal(await verifyCashfreeSignature(body, sig, ts, secret), true);
+  assert.equal(await verifyCashfreeSignature(body + " ", sig, ts, secret), false);
+  assert.equal(await verifyCashfreeSignature(body, sig, "1731400000001", secret), false);
+  assert.equal(await verifyCashfreeSignature(body, sig, ts, "other"), false);
+  assert.equal(await verifyCashfreeSignature(body, null, ts, secret), false);
+  assert.equal(await verifyCashfreeSignature(body, sig, null, secret), false);
+  assert.equal(await verifyCashfreeSignature(body, sig, ts, ""), false);
+});
+
+test("Indian mobile numbers", () => {
+  for (const ok of ["9876543210", "98765 43210", "+91 98765-43210", "+919876543210", "919876543210", "09876543210"]) {
+    assert.equal(normalizeIndianPhone(ok), "9876543210", ok);
+  }
+  for (const bad of ["", "12345", "5876543210", "98765432101", "abcdefghij", "+1 4155552671", null, 9876543210]) {
+    assert.equal(normalizeIndianPhone(bad as unknown), null, String(bad));
+  }
+});
+
+test("cashfree-safe notes drop emoji and control chars", () => {
+  assert.equal(cashfreeSafe("gg 🔥 bro\n\tnice"), "gg bro nice");
+  assert.equal(cashfreeSafe("राहुल ✓ ok"), "राहुल ✓ ok");
+  assert.equal(cashfreeSafe("a".repeat(300)).length, 200);
 });
